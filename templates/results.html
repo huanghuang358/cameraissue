@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄像头健康度分析结果</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="upload-container">
+            <h1>摄像头健康度分析结果</h1>
+            <div class="chart-section mb-4">
+                <div class="row align-items-center mb-3">
+                    <div class="col">
+                        <label for="dateSelector">选择日期:</label>
+                        <select id="dateSelector" class="form-select">
+                            {% for date in dates %}
+                                <option value="{{ date }}">{{ date }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <div class="grade-help">
+                            <i class="bi bi-question-circle"></i>
+                            <div class="grade-help-content">
+                                <h6>健康度等级说明:</h6>
+                                <ul>
+                                    <li><span class="grade-A">A级</span>: 摄像头状态良好,无异常</li>
+                                    <li><span class="grade-B">B级</span>: 摄像头略有脏污,但不影响使用</li>
+                                    <li><span class="grade-C">C级</span>: 摄像头存在严重脏污,建议清理</li>
+                                    <li><span class="grade-D">D级</span>: 摄像头不可用(离线,卡住或脏污影响过大)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="gradeChart" style="width: 100%; height: 400px;"></div>
+            </div>
+            <button class="btn btn-secondary mb-3" type="button" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#detailsTable" 
+                    aria-expanded="false">
+                显示/隐藏详细数据
+            </button>
+            <div class="collapse" id="detailsTable">
+                <table class="results-table table table-bordered">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">序号</th>
+                            <th>摄像头</th>
+                            <th>日期</th>
+                            <th>健康度等级</th>
+                            <th>详细信息</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set row_count = namespace(value=0) %}
+                        {% for result in results %}
+                            {% for date_result in result.dates %}
+                            {% set row_count.value = row_count.value + 1 %}
+                            <tr>
+                                <td class="text-center">{{ row_count.value }}</td>
+                                <td>{{ result.camera }}</td>
+                                <td>{{ date_result.date }}</td>
+                                <td class="grade-{{ date_result.health_grade }}">{{ date_result.health_grade }}</td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="toggleDetails({{ (result.camera ~ '-' ~ date_result.date) | tojson }})">
+                                        查看详情
+                                    </button>
+                                    <div id="{{ result.camera }}-{{ date_result.date }}-details" class="details-content" style="display: none;">
+                                        <form action="/review" method="post" class="review-form" onsubmit="return false;">
+                                            <input type="hidden" name="camera" value="{{ result.camera }}">
+                                            <input type="hidden" name="date" value="{{ date_result.date }}">
+                                            
+                                            <div class="form-check mb-3">
+                                                <input type="checkbox" class="form-check-input" id="frozen-{{ result.camera }}-{{ date_result.date }}"
+                                                       name="frozen" {% if date_result.frozen %}checked{% endif %}>
+                                                <label class="form-check-label" for="frozen-{{ result.camera }}-{{ date_result.date }}">
+                                                    标记为卡住(默认勾选情况为自动判断结果)
+                                                </label>
+                                            </div>
+
+                                            <table class="details-table table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>照片名称</th>
+                                                        <th>当前分类</th>
+                                                        <th>人工分类</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for image in date_result.images %}
+                                                    <tr>
+                                                        <td>
+                                                            <a href="{{ url_for('serve_image', image_path=date_result.date + '/' + result.camera + '/' + image.image) }}" 
+                                                               target="_blank">{{ image.image }}</a>
+                                                        </td>
+                                                        <td>
+                                                            {{ labels.get(image.classification, image.classification) }}
+                                                        </td>
+                                                        <td>
+                                                            <select name="classifications[{{ image.image }}]" class="form-select form-select-sm">
+                                                                <option value="perfect" {% if image.classification == 'perfect' %}selected{% endif %}>无异常</option>
+                                                                <option value="slightly-stained" {% if image.classification == 'slightly-stained' %}selected{% endif %}>略有脏污</option>
+                                                                <option value="awfully-stained" {% if image.classification == 'awfully-stained' %}selected{% endif %}>严重脏污</option>
+                                                                <option value="offline" {% if image.classification == 'offline' %}selected{% endif %}>离线</option>
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                            <button type="submit" class="btn btn-success mt-3">提交人工审核结果</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="back-button">
+                <div class="btn-group">
+                    <a href="/" class="btn btn-primary" onclick="cleanupFiles(event)">清除上传文件并返回首页</a>
+                    <a href="/export_excel" class="btn btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> 导出Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="date-statistics-data" style="display: none;">
+        {{ date_statistics | tojson | safe }}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/results.js') }}"></script>
+    <script>
+    function cleanupFiles(event) {
+        event.preventDefault();
+        fetch('/cleanup', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/';
+            } else {
+                console.error('清理文件失败:', data.error);
+                window.location.href = '/';
+            }
+        })
+        .catch(error => {
+            console.error('清理文件时出错:', error);
+            window.location.href = '/';
+        });
+    }
+    </script>
+</body>
+</html> 

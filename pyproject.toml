@@ -1,0 +1,36 @@
+[project]
+name = "camera-health-analysis"
+version = "0.1.0"
+description = "摄像头健康度分析系统"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "flask==3.0.3",
+    "waitress==3.0.1",
+    "ultralytics==8.3.23",
+    "pytorch-msssim==1.0.0",
+    "pillow==11.0.0",
+    "openpyxl==3.1.5",
+    "numpy==1.26.3",
+    "torch==2.5.0",
+    "torchvision==0.20.0",
+]
+
+[tool.uv]
+# 纯应用项目（顶层脚本，非可安装的 Python 包），只安装依赖本身
+package = false
+
+# Windows/Linux 使用 CUDA 11.8 版 PyTorch（与原 requirements.txt 的 +cu118 一致）；
+# 其他平台（如 macOS）回退到 PyPI 的 CPU 版
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu118", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu118", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
